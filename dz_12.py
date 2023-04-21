@@ -1,4 +1,3 @@
-from PhoneBook_classes import *
 from collections import UserDict
 from datetime import datetime
 import re
@@ -46,7 +45,7 @@ class Birthday (Field):
 
     @property
     def value (self):
-        return self.__value.strftime('%d-%m-%Y')
+        return self.__value
         return self.__value
 
     @value.setter
@@ -57,7 +56,7 @@ class Birthday (Field):
             raise ValueError('"dd-mm-yyyy" - birthday format')    
     
     def __str__(self) -> str:
-        return str(self.value)
+        return str(self.value.strftime('%d-%m-%Y'))
 
     def __repr__(self) -> str:
         return str(self)
@@ -100,9 +99,9 @@ class Record ():
     def days_to_birthday(self):
         
         if self.birthday:
-            dateB = self.birthday
-            today = datetime.date.today()
-            current_year_dateB = datetime.date(today.year, dateB.month, dateB.day)
+            dateB = self.birthday.value
+            today = datetime.today()
+            current_year_dateB = dateB.replace(year=today.year)
 
             if current_year_dateB < today:
                 current_year_dateB = datetime.date(today.year+1, dateB.month, dateB.day)
@@ -125,44 +124,54 @@ class Record ():
 class AddressBook(UserDict):
     index = 0
     
+    fieldnames = ['Name','Phones','Birthday']
+    
     def add_record(self, record: Record):
         self.data[record.name.value] = record
     
-    def write_csv(self, user_contacts):
+    def save(self, file_name):
         
         try:
-            with open (csv_file, 'w', newline ='') as f:
-                fieldnames = ['Name','Phones','Birthday']
-                writer = csv.DictWriter(f, fieldnames = fieldnames)
+            with open (file_name, 'w', newline ='') as f:
+                writer = csv.DictWriter(f, fieldnames = self.fieldnames)
                 writer.writeheader()
-                for name in user_contacts.data:
-                    record = user_contacts.data[name]
+                for name in self.data:
+                    record = self.data[name]
                 # for record in  user_contacts:
                     name = record.name.value
                     phones = [phone.value for phone in record.phones]
                     B_day = record.birthday
                     writer.writerow({'Name': name, 'Phones': phones, "Birthday": B_day})
         except:
-            return user_contacts
+            ...
 
     # чтение контактов 
-    def read_csv(self, reader):
-        for row in reader:
-            try:
-                record = Record(Name(row['Name'])) 
-                csv_phones = [Phone(phone) for phone in eval(row['Phones'])] if row['Phones'] !='[]' else None
-                csv_birthday = Birthday(row['Birthday']) if row['Birthday'] != '' else None
+    def load(self, filename):
+        try:
+            with open (filename, 'r', newline='') as f:
+                reader = csv.DictReader(f)
+            # contacts = user_contacts.read_csv(reader)
+                for row in reader:
+                    name = Name(row['Name']) 
+                    csv_phones = [Phone(phone) for phone in eval(row['Phones'])] if row['Phones'] !='[]' else None
+                    csv_birthday = Birthday(row['Birthday']) if row['Birthday'] != '' else None
 
-                if len(csv_phones) > 1:
-                    record.add_phones(csv_phones)
-                elif len(csv_phones) == 1:
-                    record.add_phone(next(iter(csv_phones)))
-                if csv_birthday:    
-                    record.birthday(csv_birthday.value) 
-                user_contacts.add_record(record) 
-            except (FileNotFoundError, AttributeError, KeyError, TypeError):
-                user_contacts
-        return user_contacts
+                    rec = Record(name, birthday=csv_birthday)
+                    
+                    for p in csv_phones:
+                        rec.add_phone(p)
+                    
+                    self.add_record(rec)
+                
+                # if len(csv_phones) > 1:
+                #     record.add_phones(csv_phones)
+                # elif len(csv_phones) == 1:
+                #     record.add_phone(next(iter(csv_phones)))
+                # if csv_birthday:    
+                #     record.birthday(csv_birthday.value) 
+                # user_contacts.add_record(record) 
+        except (FileNotFoundError, AttributeError, KeyError, TypeError):
+                ...
 
     def __iter__(self):
         if len(self) > 0:
@@ -186,25 +195,25 @@ class AddressBook(UserDict):
             self.index = 0
             self.keys_list =[]
 # ************************* CLASSES  *************************
-user_contacts = AddressBook()
+# user_contacts = AddressBook()
 # user_contacts = {}
 # запись контактов 
-def write_csv(csv_file, user_contacts):
+# def write_csv(csv_file, user_contacts):
         
-        try:
-            with open (csv_file, 'w', newline ='') as f:
-                fieldnames = ['Name','Phones','Birthday']
-                writer = csv.DictWriter(f, fieldnames = fieldnames)
-                writer.writeheader()
-                for name in user_contacts.data:
-                    record = user_contacts.data[name]
-                # for record in  user_contacts:
-                    name = record.name.value
-                    phones = [phone.value for phone in record.phones]
-                    B_day = record.birthday
-                    writer.writerow({'Name': name, 'Phones': phones, "Birthday": B_day})
-        except:
-            return user_contacts
+#         try:
+#             with open (csv_file, 'w', newline ='') as f:
+#                 fieldnames = ['Name','Phones','Birthday']
+#                 writer = csv.DictWriter(f, fieldnames = fieldnames)
+#                 writer.writeheader()
+#                 for name in user_contacts.data:
+#                     record = user_contacts.data[name]
+#                 # for record in  user_contacts:
+#                     name = record.name.value
+#                     phones = [phone.value for phone in record.phones]
+#                     B_day = record.birthday
+#                     writer.writerow({'Name': name, 'Phones': phones, "Birthday": B_day})
+#         except:
+#             return user_contacts
 
 # # # чтение контактов 
 # def read_csv(csv_file):
@@ -326,14 +335,15 @@ def user_show_all(*args, **kwargs):
         return "Phone book is empty", user_contacts
     else:
         for name in user_contacts.data:
-           record = user_contacts.data[name]
+           rec: Record = user_contacts.data[name]
            #rec = Record(record.name.value, birthday=record.birthday.value)
-           rec = Record(record.name.value)
-           days_birthday = rec.days_to_birthday(rec.birthday) if rec.birthday != None else None
-           print(f"{record.name.value}: {', '.join(str(phone) for phone in record.phones)}. Dirthday {record.birthday.value}. Days birthday - {days_birthday}")
+        #    rec = Record(record.name.value)
+           birthday_str = f'Birthday {str(rec.birthday)}.' if rec.birthday else ''
+           days_birthday = f'Days birthday - {rec.days_to_birthday()}.' if rec.birthday else ''
+           all += f"{rec.name.value}: {', '.join(str(phone) for phone in rec.phones)}. {birthday_str} {days_birthday}\n"
         #  for name, phone in user_contacts.items():
         #     all += f"{name}: {phone}\n"
-        # return all
+    return all, user_contacts
 # 
 @input_error
 def remove_phone(*args, **kwargs):
@@ -395,10 +405,8 @@ def main(csv_file):
     print(user_help())
     # user_contacts = AddressBook(read_csv(csv_file))
     # contacts = read_csv(csv_file)
-    with open (csv_file, 'r', newline='') as f:
-        f.seek(0)
-        reader = csv.DictReader(f)
-        contacts = user_contacts.read_csv(reader)
+    contacts = AddressBook()
+    contacts.load(csv_file)
     
     while True:
         user_input = input("Enter a command: ")
@@ -406,7 +414,7 @@ def main(csv_file):
         result, contacts = command(*data, contacts = contacts)
         print(result)
         if command == user_exit:
-            write_csv(csv_file, contacts)
+            contacts.save(csv_file)
             break
 
         if not command:
